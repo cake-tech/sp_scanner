@@ -9,18 +9,18 @@ environment:
 
 dependencies:
   ffi: ^2.1.0
-  ffigen: ^12.0.0
+  ffigen: ^8.0.0
   flutter:
     sdk: flutter
   plugin_platform_interface: ^2.0.2
   blockchain_utils:
     git:
       url: https://github.com/cake-tech/blockchain_utils
-      ref: cake-update-v1
+      ref: cake-update-v2
   bitcoin_base:
     git:
       url: https://github.com/cake-tech/bitcoin_base
-      ref: cake-mweb
+      ref: cake-update-v4
 
 dev_dependencies:
   flutter_test:
