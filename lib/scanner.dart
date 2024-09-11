@@ -70,7 +70,7 @@ Pointer<ReceiverData> createReceiverDataStruct(
   result.ref
     ..b_scan_bytes = bScanPtr
     ..B_spend_bytes = bSpendPtr
-    ..is_testnet = isTestnet ? 1 : 0
+    ..is_testnet = isTestnet
     ..labels = labelsPtr
     ..labels_len = labelsLen;
   return result;
