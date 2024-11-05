@@ -84,10 +84,13 @@ void freeReceiverDataStruct(Pointer<ReceiverData> receiverDataPtr) {
 }
 
 Pointer<Int8> callApiScanOutputs(
-    List<dynamic> outputsToCheck, String tweakDataForRecipient, Receiver receiver) {
+  List<String> outputsToCheck,
+  String tweakDataForRecipient,
+  Receiver receiver,
+) {
   final pointers = calloc<Pointer<OutputData>>(outputsToCheck.length);
   for (int i = 0; i < outputsToCheck.length; i++) {
-    pointers[i] = createOutputDataStruct(outputsToCheck[i][0].toString());
+    pointers[i] = createOutputDataStruct(outputsToCheck[i].toString());
   }
 
   final pointersReceiver = createReceiverDataStruct(
@@ -141,7 +144,7 @@ Map<String, dynamic> interpretBytesVec(Pointer<Int8> pointer) {
 }
 
 Map<String, dynamic> scanOutputs(
-  List<dynamic> outputsToCheck,
+  List<String> outputsToCheck,
   String tweakDataForRecipient,
   Receiver receiver,
 ) {
