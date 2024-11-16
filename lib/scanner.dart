@@ -29,6 +29,26 @@ class Receiver {
   final int labelsLen;
 
   Receiver(this.bScan, this.BSpend, this.isTestnet, this.labels, this.labelsLen);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'bScan': bScan,
+      'BSpend': BSpend,
+      'isTestnet': isTestnet,
+      'labels': labels,
+      'labelsLen': labelsLen,
+    };
+  }
+
+  static Receiver fromJson(Map<String, dynamic> json) {
+    return Receiver(
+      json['bScan'],
+      json['BSpend'],
+      json['isTestnet'],
+      List<int>.from(json['labels']),
+      json['labelsLen'],
+    );
+  }
 }
 
 Pointer<OutputData> createOutputDataStruct(String outputToCheck) {
