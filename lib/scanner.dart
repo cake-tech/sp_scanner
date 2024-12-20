@@ -28,7 +28,7 @@ class Receiver {
   final List<int> labels;
   final int labelsLen;
 
-  Receiver(this.bScan, this.BSpend, this.isTestnet, this.labels, this.labelsLen);
+  Receiver(this.bScan, this.BSpend, this.isTestnet, this.labels) : labelsLen = labels.length;
 
   Map<String, dynamic> toJson() {
     return {
@@ -46,7 +46,6 @@ class Receiver {
       json['BSpend'],
       json['isTestnet'],
       List<int>.from(json['labels']),
-      json['labelsLen'],
     );
   }
 }
