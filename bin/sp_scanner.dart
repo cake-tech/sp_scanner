@@ -12,7 +12,6 @@ void main(List<String> arguments) {
       "022fdc3f6726e23bfce017ab731c09e13d97cde4613bba309e5f2c507798764bca",
       false,
       [1],
-      1,
     ),
   ));
   print('Result: $result');
