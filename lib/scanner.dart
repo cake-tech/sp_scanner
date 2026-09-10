@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:sp_scanner/generated_bindings.dart';
 import 'package:blockchain_utils/blockchain_utils.dart' show BytesUtils;
@@ -167,3 +168,117 @@ Map<String, dynamic> scanOutputs(
 ) {
   return interpretBytesVec(callApiScanOutputs(outputsToCheck, tweakDataForRecipient, receiver));
 }
+
+/// A persistent native scan session: the `Secp256k1` context, `Receiver`,
+/// and labels are built once (in [ScanSession.create]) and reused across
+/// every [scan] call, instead of being rebuilt on every call the way
+/// [scanOutputs] does. Scan math and results are identical to [scanOutputs]
+/// for the same inputs.
+///
+/// Exactly one session per calling isolate — the underlying native state is
+/// not safe to share across isolates/threads.
+///
+/// There is no finalizer: callers own the native memory and MUST call
+/// [dispose] exactly once when done with the session (e.g. before the
+/// isolate holding it exits). A hard `Isolate.kill` will leak the native
+/// session — the caller must cooperatively stop and dispose first.
+class ScanSession {
+  final Pointer<SpSession> _session;
+
+  ScanSession._(this._session);
+
+  /// Creates a session for [receiver]. Throws [StateError] if the receiver
+  /// data is malformed (never expected for real wallet keys, but the native
+  /// side treats this as untrusted input rather than panicking).
+  factory ScanSession.create(Receiver receiver) {
+    final receiverData = createReceiverDataStruct(
+      receiver.bScan,
+      receiver.BSpend,
+      receiver.isTestnet,
+      receiver.labels,
+      receiver.labelsLen,
+    );
+
+    final session = lib.api_session_create(receiverData);
+    freeReceiverDataStruct(receiverData);
+
+    if (session == nullptr) {
+      throw StateError('sp_scanner: api_session_create failed on the given receiver data');
+    }
+
+    return ScanSession._(session);
+  }
+
+  /// Scans [outputsToCheck] (a list of single-element `[pubkeyHex]` lists,
+  /// matching [scanOutputs]'s shape) against [tweakDataForRecipient]. Returns
+  /// `{label: {pubkey: tweak}}`, or `{}` for no match. Throws [StateError] on
+  /// malformed input (e.g. an invalid tweak) rather than propagating a
+  /// native panic.
+  Map<String, dynamic> scan(List<dynamic> outputsToCheck, String tweakDataForRecipient) {
+    final pointers = calloc<Pointer<OutputData>>(outputsToCheck.length);
+    for (int i = 0; i < outputsToCheck.length; i++) {
+      pointers[i] = createOutputDataStruct(outputsToCheck[i][0].toString());
+    }
+
+    final tweakBytes = BytesUtils.fromHexString(tweakDataForRecipient);
+    final tweakPtr = calloc<Uint8>(tweakBytes.length);
+    tweakPtr.asTypedList(tweakBytes.length).setAll(0, tweakBytes);
+
+    final result = lib.api_session_scan(_session, pointers, outputsToCheck.length, tweakPtr);
+
+    for (int i = 0; i < outputsToCheck.length; i++) {
+      freeOutputDataStruct(pointers[i]);
+    }
+    calloc.free(pointers);
+    calloc.free(tweakPtr);
+
+    if (result == nullptr) {
+      throw StateError('sp_scanner: api_session_scan failed on the given tweak/output data');
+    }
+
+    return interpretBytesVec(result);
+  }
+
+  /// Decodes+scans one `blockchain.tweaks.subscribe` v2 binary block record
+  /// against this session. [blockBytes] is the raw block bytes — the wire
+  /// blob is base64 (see electrs-tweaks's `doc/tweaks_v2_protocol.md`), so
+  /// callers must `base64Decode` it before calling this. One block per
+  /// server push notification, so one call here per notification (the
+  /// server never batches multiple blocks into one message).
+  ///
+  /// Returns a list of match records, each shaped `{height, txid, vout,
+  /// label, output_pubkey, tweak}` (`txid` already in conventional
+  /// display-hex order, not the wire's internal/consensus order — see the
+  /// txid byte-order note in the protocol doc). An empty list means no
+  /// match, the overwhelmingly common case. Throws [StateError] on a
+  /// malformed block (server bug, or a version mismatch — this must only
+  /// ever be called with bytes produced by a server that negotiated
+  /// `protocol_version: 2`) rather than propagating a native panic.
+  List<dynamic> scanBlock(Uint8List blockBytes) {
+    final blockPtr = calloc<Uint8>(blockBytes.length);
+    blockPtr.asTypedList(blockBytes.length).setAll(0, blockBytes);
+
+    final result = lib.api_session_scan_block_v2(_session, blockPtr, blockBytes.length);
+    calloc.free(blockPtr);
+
+    if (result == nullptr) {
+      throw StateError('sp_scanner: api_session_scan_block_v2 failed on the given block bytes');
+    }
+
+    final jsonString = result.cast<Utf8>().toDartString();
+    freePointer(result);
+    return jsonDecode(jsonString) as List<dynamic>;
+  }
+
+  /// Releases the native session. Must be called exactly once; the session
+  /// must not be used afterward.
+  void dispose() {
+    lib.api_session_destroy(_session);
+  }
+}
+
+/// Highest `blockchain.tweaks.subscribe` wire-protocol version this build's
+/// native decoder understands. Capability negotiation must use
+/// `min(serverAdvertisedVersion, maxWireVersion())`, never the server's
+/// advertised version alone.
+int maxWireVersion() => lib.api_max_wire_version();
