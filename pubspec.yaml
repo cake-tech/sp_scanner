@@ -20,12 +20,13 @@ dependencies:
   bitcoin_base:
     git:
       url: https://github.com/cake-tech/bitcoin_base
-      ref: cake-update-v7
+      ref: e2d26adbe54df60159323c111ed0f6b3b8cde730
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  bip39: ^1.0.6
 
 ffigen:
   output: 'lib/generated_bindings.dart'

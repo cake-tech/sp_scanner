@@ -1615,6 +1615,115 @@ class NativeLibrary {
   late final _api_scan_outputs = _api_scan_outputsPtr
       .asFunction<ffi.Pointer<ffi.Int8> Function(ffi.Pointer<ParamData>)>();
 
+  /// Creates a session from a receiver config. Returns null on malformed input
+  /// or on internal panic — callers must null-check before use.
+  ffi.Pointer<SpSession> api_session_create(
+    ffi.Pointer<ReceiverData> config,
+  ) {
+    return _api_session_create(
+      config,
+    );
+  }
+
+  late final _api_session_createPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Pointer<SpSession> Function(
+              ffi.Pointer<ReceiverData>)>>('api_session_create');
+  late final _api_session_create = _api_session_createPtr
+      .asFunction<ffi.Pointer<SpSession> Function(ffi.Pointer<ReceiverData>)>();
+
+  /// Destroys a session created by `api_session_create`. Safe to call with null.
+  void api_session_destroy(
+    ffi.Pointer<SpSession> session,
+  ) {
+    return _api_session_destroy(
+      session,
+    );
+  }
+
+  late final _api_session_destroyPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<SpSession>)>>(
+          'api_session_destroy');
+  late final _api_session_destroy = _api_session_destroyPtr
+      .asFunction<void Function(ffi.Pointer<SpSession>)>();
+
+  /// Scans `outputs_data` against `tweak_bytes` using the given session.
+  /// Returns `"{}"` for the (overwhelmingly common) no-match case without a
+  /// serde round-trip, a JSON match map on a hit, or null on malformed input /
+  /// internal panic — callers must null-check before treating the result as a
+  /// string, and must still call `free_pointer` on any non-null result.
+  ffi.Pointer<ffi.Int8> api_session_scan(
+    ffi.Pointer<SpSession> session,
+    ffi.Pointer<ffi.Pointer<OutputData>> outputs_data,
+    int outputs_data_len,
+    ffi.Pointer<ffi.Uint8> tweak_bytes,
+  ) {
+    return _api_session_scan(
+      session,
+      outputs_data,
+      outputs_data_len,
+      tweak_bytes,
+    );
+  }
+
+  late final _api_session_scanPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Pointer<ffi.Int8> Function(
+              ffi.Pointer<SpSession>,
+              ffi.Pointer<ffi.Pointer<OutputData>>,
+              ffi.Uint64,
+              ffi.Pointer<ffi.Uint8>)>>('api_session_scan');
+  late final _api_session_scan = _api_session_scanPtr.asFunction<
+      ffi.Pointer<ffi.Int8> Function(ffi.Pointer<SpSession>,
+          ffi.Pointer<ffi.Pointer<OutputData>>, int, ffi.Pointer<ffi.Uint8>)>();
+
+  /// Decodes+scans one v2 block record (`block_bytes`, already base64-decoded
+  /// by the caller) against `session`'s persistent receiver. Returns a JSON
+  /// array of match records `{height, txid, vout, label, output_pubkey,
+  /// tweak}` (txid in display-hex order, per the note above), `"[]"` for the
+  /// overwhelmingly common no-match case (no serde round-trip), or null on a
+  /// malformed block / internal panic — same untrusted-input contract as the
+  /// rest of the session API (ADR-0006).
+  ffi.Pointer<ffi.Int8> api_session_scan_block_v2(
+    ffi.Pointer<SpSession> session,
+    ffi.Pointer<ffi.Uint8> block_bytes,
+    int block_bytes_len,
+  ) {
+    return _api_session_scan_block_v2(
+      session,
+      block_bytes,
+      block_bytes_len,
+    );
+  }
+
+  late final _api_session_scan_block_v2Ptr = _lookup<
+      ffi.NativeFunction<
+          ffi.Pointer<ffi.Int8> Function(
+              ffi.Pointer<SpSession>,
+              ffi.Pointer<ffi.Uint8>,
+              ffi.Uint64)>>('api_session_scan_block_v2');
+  late final _api_session_scan_block_v2 =
+      _api_session_scan_block_v2Ptr.asFunction<
+          ffi.Pointer<ffi.Int8> Function(
+              ffi.Pointer<SpSession>, ffi.Pointer<ffi.Uint8>, int)>();
+
+  /// Highest `blockchain.tweaks.subscribe` wire-protocol version this build's
+  /// decoder understands. `1` = JSON only (`api_scan_outputs`/`api_session_scan`).
+  /// `2` = the compact binary protocol (`api_session_scan_block_v2`), per
+  /// electrs-tweaks's `doc/tweaks_v2_protocol.md`. Client-side capability
+  /// negotiation must take `min(server-advertised, this)`, never the server's
+  /// offer alone, so a client can't attempt a version its own decoder can't
+  /// read.
+  int api_max_wire_version() {
+    return _api_max_wire_version();
+  }
+
+  late final _api_max_wire_versionPtr =
+      _lookup<ffi.NativeFunction<ffi.Uint32 Function()>>(
+          'api_max_wire_version');
+  late final _api_max_wire_version =
+      _api_max_wire_versionPtr.asFunction<int Function()>();
+
   void free_pointer(
     ffi.Pointer<ffi.Char> ptr,
   ) {
@@ -1741,7 +1850,7 @@ final class __pthread_mutex_s extends ffi.Struct {
   external int __spins;
 
   @ffi.Short()
-  external int __elision;
+  external int __unused;
 
   external __pthread_list_t __list;
 }
@@ -1773,11 +1882,8 @@ final class __pthread_rwlock_arch_t extends ffi.Struct {
   @ffi.Int()
   external int __shared;
 
-  @ffi.SignedChar()
-  external int __rwelision;
-
-  @ffi.Array.multi([7])
-  external ffi.Array<ffi.UnsignedChar> __pad1;
+  @ffi.UnsignedLong()
+  external int __pad1;
 
   @ffi.UnsignedLong()
   external int __pad2;
@@ -1792,9 +1898,6 @@ final class __pthread_cond_s extends ffi.Struct {
   external __atomic_wide_counter __g1_start;
 
   @ffi.Array.multi([2])
-  external ffi.Array<ffi.UnsignedInt> __g_refs;
-
-  @ffi.Array.multi([2])
   external ffi.Array<ffi.UnsignedInt> __g_size;
 
   @ffi.UnsignedInt()
@@ -1805,6 +1908,12 @@ final class __pthread_cond_s extends ffi.Struct {
 
   @ffi.Array.multi([2])
   external ffi.Array<ffi.UnsignedInt> __g_signals;
+
+  @ffi.UnsignedInt()
+  external int __unused_initialized_1;
+
+  @ffi.UnsignedInt()
+  external int __unused_initialized_2;
 }
 
 final class __once_flag extends ffi.Struct {
@@ -1934,6 +2043,8 @@ typedef __compar_fn_tFunction = ffi.Int Function(
 typedef Dart__compar_fn_tFunction = int Function(
     ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>);
 
+final class SpSession extends ffi.Opaque {}
+
 final class OutputData extends ffi.Struct {
   external ffi.Pointer<ffi.Uint8> pubkey_bytes;
 
@@ -1990,6 +2101,8 @@ const int _FEATURES_H = 1;
 
 const int _DEFAULT_SOURCE = 1;
 
+const int __GLIBC_USE_ISOC2Y = 1;
+
 const int __GLIBC_USE_ISOC23 = 1;
 
 const int __USE_ISOC11 = 1;
@@ -2000,7 +2113,7 @@ const int __USE_ISOC95 = 1;
 
 const int _POSIX_SOURCE = 1;
 
-const int _POSIX_C_SOURCE = 200809;
+const int _POSIX_C_SOURCE = 202405;
 
 const int __USE_POSIX = 1;
 
@@ -2015,6 +2128,8 @@ const int __USE_XOPEN2K = 1;
 const int __USE_XOPEN2K8 = 1;
 
 const int _ATFILE_SOURCE = 1;
+
+const int __USE_XOPEN2K24 = 1;
 
 const int __WORDSIZE = 64;
 
@@ -2042,7 +2157,7 @@ const int __GNU_LIBRARY__ = 6;
 
 const int __GLIBC__ = 2;
 
-const int __GLIBC_MINOR__ = 40;
+const int __GLIBC_MINOR__ = 43;
 
 const int _SYS_CDEFS_H = 1;
 
@@ -2228,9 +2343,9 @@ const int __W_CONTINUED = 65535;
 
 const int __WCOREFLAG = 128;
 
-const int __HAVE_FLOAT128 = 0;
+const int __HAVE_FLOAT128 = 1;
 
-const int __HAVE_DISTINCT_FLOAT128 = 0;
+const int __HAVE_DISTINCT_FLOAT128 = 1;
 
 const int __HAVE_FLOAT64X = 1;
 
@@ -2258,7 +2373,7 @@ const int __HAVE_DISTINCT_FLOAT64X = 0;
 
 const int __HAVE_DISTINCT_FLOAT128X = 0;
 
-const int __HAVE_FLOAT128_UNLIKE_LDBL = 0;
+const int __HAVE_FLOAT128_UNLIKE_LDBL = 1;
 
 const int __HAVE_FLOATN_NOT_TYPEDEF = 0;
 
@@ -2355,8 +2470,6 @@ const int __SIZEOF_PTHREAD_BARRIERATTR_T = 4;
 const int _THREAD_MUTEX_INTERNAL_H = 1;
 
 const int __PTHREAD_MUTEX_HAVE_PREV = 1;
-
-const int __PTHREAD_RWLOCK_ELISION_EXTRA = 0;
 
 const int __have_pthread_attr_t = 1;
 
